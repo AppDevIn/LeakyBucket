@@ -1,0 +1,51 @@
+server:
+  port: 8080
+
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      # The limiter fails open on Redis errors, so a slow Redis must turn into an error
+      # quickly. Lettuce's default is 60s, which stalls every rate-limited request.
+      timeout: 500ms
+      connect-timeout: 500ms
+      # No password: the local Redis instance runs without requirepass and is bound
+      # to 127.0.0.1. Set this (and requirepass in redis.conf) before exposing Redis.
+      # password: yourStrongPassword
+
+  cloud:
+    gateway:
+      routes:
+        - id: user-service
+          # Direct URI so the gateway is testable without service discovery.
+          # With Eureka/Consul running, swap for: lb://USER-SERVICE
+          uri: ${USER_SERVICE_URI:http://localhost:8081}
+          predicates:
+            - Path=/users/**
+          filters:
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@leakyBucketRateLimiter}"
+                key-resolver: "#{@userKeyResolver}"
+                leaky-bucket-rate-limiter.capacity: 20
+                leaky-bucket-rate-limiter.leakRatePerSec: 5
+
+        - id: order-service
+          uri: ${ORDER_SERVICE_URI:http://localhost:8081}
+          predicates:
+            - Path=/orders/**
+          filters:
+            - StripPrefix=1
+            - name: RequestRateLimiter
+              args:
+                rate-limiter: "#{@leakyBucketRateLimiter}"
+                key-resolver: "#{@userKeyResolver}"
+                leaky-bucket-rate-limiter.capacity: 10
+                leaky-bucket-rate-limiter.leakRatePerSec: 2
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG   # turn off after testing
+    com.yourorg.gateway: DEBUG

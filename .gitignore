@@ -1,0 +1,15 @@
+# Local JDK and Gradle distributions
+.tools/
+
+# Gradle
+.gradle/
+build/
+
+# Runtime logs
+logs/
+*.log
+
+# IDE
+.idea/
+*.iml
+.vscode/
